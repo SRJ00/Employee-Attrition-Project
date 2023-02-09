@@ -1,0 +1,414 @@
+---
+title: ''
+author: ''
+date: ''
+output:
+  pdf_document: default
+  word_document: default
+subtitle: ''
+---
+
+\begin{center}
+\Large{\textbf{Department of Statistics, SPPU}\\
+\textbf{ST-O13 Statistical Learning and Data Mining}\\
+ETE Assignment 2022-23\\}
+\textit{Ayshik Neogi} 2102|\textit{Saurav Jadhav} 2120\\
+22-11-2022
+\end{center}
+
+# Introduction
+
+A large company named ABC, employs, at any given point of time, around 4000 employees. However, every year, around 15% of its employees leave the company and the company needs to replace them with the talent pool available in the job market.
+
+The management believes that this level of attrition (employees leaving, either on their own or because they got fired) is bad for the company, because of the following reasons:
+
+1. The former employees' projects get delayed, making it difficult to meet    timelines, resulting in a loss of reputation among clients and partners.
+2. More often than not, the new employees have to be trained for the job and/or given time to acclimatise themselves to the company.
+
+
+The purpose of the analysis is to find what factors share a strong relationship with attrition and use them to decide what changes to be made in the workplace to retain employees.
+
+Before we dive into the analysis from the data. It is first important to think about this problem instinctively. 
+
+1. How would a firm reduce its attrition rate?
+2. And, more importantly, what causes an increase in the firm's attrition rate?
+3. Or, what factors make an employee stay in the company?
+
+
+# Heuristic based answer to the problem
+
+From the above three questions, we will be specifically looking at the third question:
+
+What factors make an employee stay in the company?
+
+After looking at the question, the first thing which can immediately come to mind is the good pay scale.
+
+1. Pay scale above the industry standards seems like a good reason for an employee to stay in the company.
+
+As this is a business problem, increasing the pay scale of the employee for the sake of reducing the attrition rate is not an economical solution. Also, this may not be a sole reason due to which an employee might stay into the company.
+
+2. Appreciation to the employees for their good work.
+3. Promotion for the deserving candidates.
+4. Friendly environment: communication apart from the professional work.
+5. Non-toxic work culture. Like asking employees to work on weekends, more than 8 hrs per day, and so on may promote some sort of toxicness in the work.
+
+The above solutions, if imparted might reduce the attrition rate in the company.
+
+# Data driven solution to the problem
+
+The data consists of 5 different sheets:
+
+\textbf{Data Dictionary}: Consists of metadata.
+
+\textbf{Employee Survey Data}: This consists of employee survey data such as job satisfaction, work-life balance, and so on.
+
+\textbf{General data}: The data consists of age, employee ID, gender, and other general information about the employee.
+
+\textbf{In time}: The data consists of the login time of the employee.
+
+\textbf{Out Time}: The data consists of the logout time of the employee.
+
+\textbf{Manager Survey Data}: The survey data consists of manager ratings of the employee.
+
+All the above data is considered for analysis.
+
+## Data
+
+```{r,include=TRUE,message=FALSE,warning=FALSE}
+data<-read.csv("C:/Masters SPPU/3rd Sem/ST O13/ETE Assignment/employee data - general_data.csv")
+```
+
+## General Information
+
+Number of employees in the company
+
+```{r,include=TRUE,message=FALSE,warning=FALSE}
+num_employee<-nrow(data);num_employee
+```
+
+Number of employees who left the company the previous year
+
+```{r,include=TRUE,message=FALSE,warning=FALSE}
+num_employees_left<-length(which(data$Attrition=="Yes"));num_employees_left
+```
+
+Attrition Rate
+
+```{r,include=TRUE,message=FALSE,warning=FALSE}
+threshold<-num_employees_left/num_employee*100;threshold
+```
+
+The event under which an employee leaves the company has to be significant. Under the normal conditions, observing an employee leave the company may be unlikely. Observing the extreme cases will be more informative and can help understand the cause of an employee leaving the company. For example, companies paying employees below industry standard will have a higher attrition rate. In our case, the base attrition rate of the company is around 16%. But with the employees who have a low pay scale it is around 18%.
+
+In the data it is verified that, if there’s an NA in the employee login and logout time, then an employee was on a leave. And for an NA in login time we have an NA in logout time for that particular date.
+
+Verification that, no one forgot to punch in or punch out
+
+```{r,include=TRUE,message=FALSE,warning=FALSE}
+Out_Time<-data[,33:293]
+In_Time<-data[,294:ncol(data)]
+holiday<-c()
+for (i in 1:ncol(In_Time))
+{
+  holiday[i]<-length(which(is.na(In_Time[,i])==TRUE))
+}
+Out_Time1<-Out_Time[,-which(holiday==num_employee)]
+In_Time1<-In_Time[,-which(holiday==num_employee)]
+
+x<-y<-c()
+for (i in 1:num_employee)
+{
+  x[i]<-length(which(is.na(Out_Time1[i,])==TRUE))
+  y[i]<-length(which(is.na(In_Time1[i,])==TRUE))
+}
+length(which(x!=y))
+```
+
+Three features are constructed:
+ 
+\textbf{avg_time}: This feature indicates the average time an employee spends in the company per day.
+
+\textbf{avg_time_In}: This feature indicates the average time at which an employee enters the company daily.
+
+\textbf{Employee Leaves}: This feature indicates the number leaves taken by an employee apart from holidays throughout the year.
+
+```{r,include=TRUE,message=FALSE,warning=FALSE}
+employee_leaves<-x
+
+d<-data[,33:ncol(data)]
+d[is.na(d)]<-"0"
+n<-ncol(d)/2
+Out_data<-d[1:n]
+In_data<-d[(n+1):522]
+time_diff<-intime<-outime<-list()
+for(i in 1:n)
+{ 
+  outime[[i]]<-intime[[i]]<-time_diff[[i]]<-0*seq(dim(d)[1])
+  for (j in 1:dim(d)[1])
+  {
+    temp<-as.difftime(c(Out_data[[i]][j],In_data[[i]][j]))
+    time_diff[[i]][j]<-temp[1]-temp[2]
+    if (is.na(time_diff[[i]][j])==TRUE)
+      time_diff[[i]][j]<-0
+    intime[[i]][j]<-temp[2]
+    if (is.na(intime[[i]][j])==TRUE)
+      intime[[i]][j]<-0
+    outime[[i]][j]<-temp[1]
+  }
+}
+
+avg_time<-c()
+for(j in 1:dim(d)[1])
+{ 
+  a<-c()
+  for(i in 1:n)
+  {
+    a[i]<-time_diff[[i]][j]  
+  }
+  avg_time[j]<-mean(a)
+}
+
+avg_time_In<-c()
+for(j in 1:dim(d)[1])
+{ 
+  b<-c()
+  for(i in 1:n)
+  {
+    b[i]<-intime[[i]][j]  
+  }
+  avg_time_In[j]<-mean(b)
+}
+Time_data<-data.frame(avg_time,avg_time_In,employee_leaves)
+# write.csv(Time_data,file = "Time.csv")
+```
+
+## Attrition rate of the extreme observations in the ordinal features.
+
+For the below table, 5-percentile and 95-percentile values of the attrition rate are considered. The 5-percentile value indicates the value under which the 5 percent of the data lies. The 95-percentile value indicates the value below which the 95 percent of the data lies. By looking at the below table, we observe the attrition rate for very low and very high values of the features.
+
+```{r,include=TRUE,message=FALSE,warning=FALSE}
+lower_tail_5perc<-upper_tail_5perc<-lower_tail_10perc<-upper_tail_10perc<-c()
+for (i in 1:23)
+{
+  a<-length(which(is.na(data[,i+8]==TRUE)))
+  if(a==0)
+  {
+    t<-data[,i+8]
+  }
+  if(a!=0)
+  {
+    t_NA<-which(is.na(data[,i+8]==TRUE))
+    t<-data[,i+8][-t_NA]
+  }
+  q<-quantile(t,probs = c(0.05,0.95))
+  lower_tail_5perc[i]<-length(which(data$Attrition[which(t<=q[1])]=="Yes"))/length(which(t<=q[1]))*100
+  upper_tail_5perc[i]<-length(which(data$Attrition[which(t>=q[2])]=="Yes"))/length(which(t>=q[2]))*100
+}
+Final<-data.frame(lower_tail_5perc,upper_tail_5perc)
+rownames(Final)<-colnames(data[,9:31])
+Final<-Final[-c(4,6,15),];Final
+```
+
+It is important to observe the higher attrition rate for the particular features. But not only this, we also need to observe lower attrition rates in order to get a picture of why employees stay?
+
+The numbers highlighted in the above table indicate the significant high or significant lower values of the attrition rate from the baseline, that is, 16% which is the attrition rate of the company.
+
+From the above table we observe the following:
+
+1. The employees who worked with more companies are more likely to switch than average.
+2. The employees who have not spent much of the time within the company are more likely to make a switch.
+3. The employees who stayed for a long time within the company are very less likely to make a switch.
+4. The employees who haven’t spent much time with the current manager are more likely to make a switch.
+5. The employees who spent a lot of time with their current manager are less likely to make a switch.
+6. Younger employees are more likely to make a switch.
+7. The employees who are rated low on a job involvement scale are more likely to make a switch. This is also an indication that their manager may not be satisfied with their performance.
+8. The employees who spent lower daily time in the company are less likely to switch the company. This may also be an indication of not having a workload, making an employee satisfied.
+9. The employees who spent more daily time in the company are more likely to switch the company. This may indicate higher workload.
+10. The employees who tend to arrive early are less likely to leave the job. Maybe this is an indication of interest in the work.
+11. The employees who tend to arrive late in the company are more likely to leave the job. It may be an indication of having a casual attitude towards the job.
+12. The employees with lower leaves are more likely to leave the job.
+13. The employees with more leaves are less likely to make a switch.
+
+## Attrition rate within the different levels of the nominal features.
+
+```{r,include=TRUE,message=FALSE,warning=FALSE}
+D<-data[,c(1:8)]
+D<-D[,-c(1,5)]
+a<-c()
+prop<-most_attrition<-dataF<-list()
+for (i in 1:ncol(D))
+{
+  a<-unique(D[,i])
+  prop[[i]]<-rep(0,length(a))
+  for (j in 1:length(a))
+  {
+    prop[[i]][j]<-length(which(D[,i]==a[j]&data$Attrition=="Yes"))/length(which(D[,i]==a[j]))*100
+  }
+  dataF[[i]]<-data.frame(a,prop[[i]])
+  colnames(dataF[[i]])<-c("Levels","Proportion of employees leaving the job")
+  most_attrition[[i]]<-a[which(prop[[i]]>threshold)]
+}
+a<-sort(unique(data$Education))
+Education_Nominal<-c()
+for (j in 1:length(a))
+{
+  Education_Nominal[j]<-length(which(data$Education==a[j]&data$Attrition=="Yes"))/length(which(data$Education==a[j]))*100
+}
+levels_a<-c("Below College","College","Bachelor","Master","Doctor")
+Edu<-data.frame(levels_a,Education_Nominal)
+colnames(Edu)<-c("Levels","Proportion of employees leaving the job")
+dataF[[7]]<-Edu
+dataF
+```
+
+From the above tables we observe the following:
+
+1. Research directors are more likely to switch the company.
+2. Single employees are more likely to leave the job.The reason might be to explore better opportunities in the initial stages.
+3. Human resource employees are more likely to leave the job.
+4. The employees who come from a human resource background are more likely to make a switch.
+5. The employees who travel frequently are more likely to leave the job. 
+6. The employees who do not travel are less likely to leave the job.
+7. Students with college level of education are more likely to make a switch. Although the attrition rate is not significant.
+
+## Graphical interpretations
+
+The tables gave us a picture about the attrition for different features.Graphs will help us easily understand the overall picture of attrition for different employee features. 
+
+The bars in red indicate the count of employees who left the company with respect to a specific feature. For example, count of employees who left the company with respect to the number of years at the company.
+
+The bars in green indicate the count of employees who are still working in the company for that specific feature.
+
+```{r,include=TRUE,message=FALSE,warning=FALSE}
+counts <- table(data$Attrition,data$NumCompaniesWorked)
+barplot(counts, main="Attrition with NumCompaniesWorked ",
+        xlab="NumCompaniesWorked",ylab="No of Emplyoees", col=c("green","red"),
+        legend = rownames(counts),beside=TRUE)
+```
+
+The graph indicates the count for the employees with respect to the number of companies they have worked before.
+
+```{r,include=TRUE,message=FALSE,warning=FALSE}
+counts <- table(data$Attrition,data$YearsAtCompany)
+barplot(counts, main="Attrition with YearsAtCompany",
+        xlab="YearsAtCompany",ylab="No of Emplyoees", col=c("green","red"),
+        legend = rownames(counts),beside=TRUE)
+```
+
+The graph indicates the count for the employees with respect to the years at the company.
+
+```{r,include=TRUE,message=FALSE,warning=FALSE}
+counts <- table(data$Attrition,data$YearsWithCurrManager)
+barplot(counts, main="Attrition with YearsWithCurrManager",
+        xlab="YearsWithCurrManager",ylab="No of Emplyoees", col=c("green","red"),
+        legend = rownames(counts),beside=TRUE)
+```
+
+The graph indicates the count for the employees with respect to the years with the current manager.
+
+```{r,include=TRUE,message=FALSE,warning=FALSE}
+counts <- table(data$Attrition,data$JobInvolvement)
+barplot(counts, main="Attrition with JobInvolvement",
+        xlab="JobInvolvement",ylab="No of Emplyoees", col=c("green","red"),
+        legend = rownames(counts),beside=TRUE)
+```
+
+The graph indicates the count for the employees with respect to their job involvement.
+
+```{r,include=TRUE,message=FALSE,warning=FALSE}
+counts <- table(data$Attrition,data$Employee_leaves)
+barplot(counts, main="Attrition with Employee_leaves",
+        xlab="Employee_leaves",ylab="No of Emplyoees", col=c("green","red"),
+        legend = rownames(counts),beside=TRUE)
+```
+
+The graph indicates the count for the employees with respect to the number of leaves they've taken.
+
+```{r,include=TRUE,message=FALSE,warning=FALSE}
+counts <- table(data$Attrition,data$JobRole)
+barplot(counts, main="Attrition with JobRole",
+        xlab="JobRole",ylab="No of Emplyoees", col=c("green","red"),
+        legend = rownames(counts),beside=TRUE)
+```
+
+The graph indicates the count for the employees with respect to different job roles.
+
+```{r,include=TRUE,message=FALSE,warning=FALSE}
+counts <- table(data$Attrition,data$MaritalStatus)
+barplot(counts, main="Attrition with MaritalStatus",
+        xlab="MaritalStatus",ylab="No of Emplyoees", col=c("green","red"),
+        legend = rownames(counts),beside=TRUE)
+```
+
+The graph indicates the count for the employees with respect to the employee's marital status.
+
+```{r,include=TRUE,message=FALSE,warning=FALSE}
+counts <- table(data$Attrition,data$BusinessTravel)
+barplot(counts, main="Attrition with BusinessTravel",
+        xlab="BusinessTravel",ylab="No of Emplyoees", col=c("green","red"),
+        legend = rownames(counts),beside=TRUE)
+```
+
+The graph indicates the count for the employees with respect to the employee's frequency of business travel.
+
+```{r,include=TRUE,message=FALSE,warning=FALSE}
+counts<-table(data$Attrition,data$Department)
+barplot(counts, main="Attrition with job department",
+        xlab="departments",ylab="No of Emplyoees" ,col=c("green","red"),
+        legend = rownames(counts),beside=TRUE)
+```
+
+The graph indicates the count for the employees with respect to the employee's job department.
+
+```{r,include=TRUE,message=FALSE,warning=FALSE}
+counts <- table(data$Attrition,data$EducationField)
+barplot(counts, main="Attrition with EducationField",
+        xlab="EducationField",ylab="No of Emplyoees", col=c("green","red"),
+        legend = rownames(counts),beside=TRUE)
+```
+
+The graph indicates the count for the employees with respect to the employee's education field.
+
+## Curve Interpretations
+
+The below curves indicate the values of continuous features of the employees who left the company as well as for those who stayed. The curve for those who left is indicated in red and for those who stayed is indicated in green. The legend indicates the attrition value, that is:
+
+1. ‘Yes’ for those who left the company.
+2. ‘No’ for those who stayed.
+
+```{r,include=TRUE,message=FALSE,warning=FALSE}
+Attrition_n<-unclass(as.factor(data$Attrition)) ##Yes<-2,No<-1,converting categorical variable tonumeric varaible
+Age<-data$Age
+d<-data.frame(Attrition_n,Age)
+plot(density(d$Age[which(d$Attrition_n==1)]),main="comparison between age & Attrition",
+     xlab="Age of employee",col="green",ylim = c(0,0.06),lwd = 2)
+lines(density(d$Age[which(d$Attrition_n==2)]),col = "red",lwd = 2)
+legend<-legend(x = "topright",legend = c("No", "Yes")
+               ,col= c("green","red"),lwd = 2, cex = 0.5)
+```
+
+The graph indicate the curves for the employees with respect to the employee's age.
+
+```{r,include=TRUE,message=FALSE,warning=FALSE}
+avg_work_time<-data$avg_time
+d<-data.frame(Attrition_n,avg_work_time)
+plot(density(d$avg_work_time[which(d$Attrition_n==1)]),main="comparison between avg_work_time & Attrition",
+             xlab="avg_work_time of employee",col="green",ylim=c(0,0.5),lwd = 2)
+lines(density(d$avg_work_time[which(d$Attrition_n==2)]),col = "red",lwd = 2)
+legend<-legend(x = "topright",legend = c("No", "Yes")
+               ,col= c("green","red"),lwd = 2,cex = 0.5)
+```
+
+The graph indicates the curves for the employees with respect to the employee's average daily work time.
+
+```{r,include=TRUE,message=FALSE,warning=FALSE}
+avg_time_In<-data$avg_time_In
+d<-data.frame(Attrition_n,avg_time_In)
+plot(density(d$avg_time_In[which(d$Attrition_n==1)]),main="comparison between avg_time_In & Attrition",
+     xlab="avg_time_In of employee",col="green",ylim=c(0,1.7),lwd = 2)
+lines(density(d$avg_time_In[which(d$Attrition_n==2)]),col = "red",lwd = 2)
+legend<-legend(x = "topright",legend = c("No", "Yes")
+               ,col= c("green","red"),lwd = 2,cex = 0.5)
+```
+
+The graph indicates the curves for the employees with respect to the employee's average daily login time.
