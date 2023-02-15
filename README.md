@@ -30,7 +30,7 @@ Let's suppose if an employee do not answer the question on work culture in an em
 
 Hence, focus around the missing values, and extreme cases will give better understanding of the employee attrition problem which will directly result into better recommendation to the firm.
 
-### We hope you will find our report an amazing read! 
+### We hope you will find our report interesting! 
 
 
 
